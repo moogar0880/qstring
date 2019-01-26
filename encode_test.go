@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestMarshallString(t *testing.T) {
+func TestMarshalString(t *testing.T) {
 	ts := TestStruct{
 		Name:     "SomeName",
 		Do:       true,
@@ -59,7 +59,7 @@ func TestMarshallString(t *testing.T) {
 	}
 }
 
-func TestMarshallValues(t *testing.T) {
+func TestMarshalValues(t *testing.T) {
 	ts := TestStruct{
 		Name:     "SomeName",
 		Do:       true,
@@ -272,7 +272,7 @@ func (u *MarshalInterfaceTest) MarshalQuery() (url.Values, error) {
 	return url.Values{"names": u.Names}, nil
 }
 
-func TestMarshaller(t *testing.T) {
+func TestMarshaler(t *testing.T) {
 	s := &MarshalInterfaceTest{Names: []string{"foo", "bar"}}
 
 	testIO := []struct {
@@ -286,7 +286,7 @@ func TestMarshaller(t *testing.T) {
 	for _, test := range testIO {
 		v, err := Marshal(test.inp)
 		if err != test.err {
-			t.Errorf("Expected Marshaller to return %s, but got %s instead", test.err, err)
+			t.Errorf("Expected Marshaler to return %s, but got %s instead", test.err, err)
 		}
 
 		if len(v) != len(test.vals) {

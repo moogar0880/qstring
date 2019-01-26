@@ -6,7 +6,7 @@ import (
 )
 
 // Straight benchmark literal.
-func BenchmarkUnmarshall(b *testing.B) {
+func BenchmarkUnmarshal(b *testing.B) {
 	query := url.Values{
 		"limit":  []string{"10"},
 		"page":   []string{"1"},
@@ -17,11 +17,11 @@ func BenchmarkUnmarshall(b *testing.B) {
 		Limit  int
 		Page   int
 	}
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		data := &QueryStruct{}
-		err := Unmarshal(query, data)
-		if err != nil {
+		var data QueryStruct
+		if err := Unmarshal(query, &data); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -39,12 +39,12 @@ func BenchmarkRawPLiteral(b *testing.B) {
 		Limit  int
 		Page   int
 	}
+	b.ReportAllocs()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			data := &QueryStruct{}
-			err := Unmarshal(query, data)
-			if err != nil {
+			var data QueryStruct
+			if err := Unmarshal(query, &data); err != nil {
 				b.Fatal(err)
 			}
 		}

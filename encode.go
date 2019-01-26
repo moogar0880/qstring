@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// Marshaller defines the interface for performing custom marshalling of struct
+// Marshaler defines the interface for performing custom marshaling of struct
 // values into query strings
-type Marshaller interface {
+type Marshaler interface {
 	MarshalQuery() (url.Values, error)
 }
 
@@ -24,11 +24,11 @@ func Marshal(v interface{}) (url.Values, error) {
 // Marshal marshals the provided struct into a raw query string and returns a
 // conditional error
 func MarshalString(v interface{}) (string, error) {
-	vals, err := Marshal(v)
+	values, err := Marshal(v)
 	if err != nil {
 		return "", err
 	}
-	return vals.Encode(), nil
+	return values.Encode(), nil
 }
 
 // An InvalidMarshalError describes an invalid argument passed to Marshal or
@@ -64,7 +64,7 @@ func (e *encoder) marshal() (url.Values, error) {
 	}
 
 	switch val := e.data.(type) {
-	case Marshaller:
+	case Marshaler:
 		return val.MarshalQuery()
 	default:
 		return e.value(rv)
@@ -100,9 +100,13 @@ func (e *encoder) value(val reflect.Value) (url.Values, error) {
 		case reflect.Slice:
 			output[qstring] = marshalSlice(elemField)
 		case reflect.Ptr:
-			marshalStruct(output, qstring, reflect.Indirect(elemField), k)
+			if err := marshalStruct(output, qstring, reflect.Indirect(elemField), k); err != nil {
+				return nil, err
+			}
 		case reflect.Struct:
-			marshalStruct(output, qstring, elemField, k)
+			if err := marshalStruct(output, qstring, elemField, k); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return output, err
@@ -145,15 +149,15 @@ func marshalStruct(output url.Values, qstring string, field reflect.Value, sourc
 	case time.Time, ComparativeTime:
 		output.Set(qstring, marshalValue(field, source))
 	default:
-		var vals url.Values
+		var values url.Values
 		if field.CanAddr() {
-			vals, err = Marshal(field.Addr().Interface())
+			values, err = Marshal(field.Addr().Interface())
 		}
 
 		if err != nil {
 			return err
 		}
-		for key, list := range vals {
+		for key, list := range values {
 			output[key] = list
 		}
 	}

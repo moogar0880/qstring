@@ -1,10 +1,16 @@
 # qstring
+
 This package provides an easy way to marshal and unmarshal url query string data to
 and from structs.
 
+[![Build Status](https://travis-ci.org/moogar0880/qstring.svg?branch=master)](https://travis-ci.org/moogar0880/qstring)
+[![Go Report Card](https://goreportcard.com/badge/github.com/moogar0880/qstring)](https://goreportcard.com/report/github.com/moogar0880/qstring)
+[![GoDoc](https://godoc.org/github.com/moogar0880/qstring?status.svg)](https://godoc.org/github.com/moogar0880/qstring)
+
 ## Installation
+
 ```bash
-$ go get github.com/dyninc/qstring
+$ go get github.com/moogar0880/qstring
 ```
 
 ## Examples
@@ -17,7 +23,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/dyninc/qstring"
+	"github.com/moogar0880/qstring"
 )
 
 // Query is the http request query struct.
@@ -28,9 +34,8 @@ type Query struct {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	query := &Query{}
-	err := qstring.Unmarshal(req.Url.Query(), query)
-	if err != nil {
+	var query Query
+	if err := qstring.Unmarshal(req.Url.Query(), query); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
@@ -51,12 +56,14 @@ Query{
 }
 ```
 
-### Marshalling
+### Marshaling
+
 `qstring` also exposes two methods of Marshaling structs *into* Query parameters,
 one will Marshal the provided struct into a raw query string, the other will
-Marshal a struct into a `url.Values` type. Some Examples of both follow.
+Marshal a struct into a `url.Values` type. Some examples of both follow.
 
 ### Marshal Raw Query String
+
 ```go
 package main
 
@@ -64,29 +71,30 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dyninc/qstring"
+	"github.com/moogar0880/qstring"
 )
 
 // Query is the http request query struct.
 type Query struct {
-	Names    []string
-	Limit     int
-	Page      int
+	Names   []string
+	Limit   int
+	Page    int
 }
 
 func main() {
 	query := &Query{
 		Names: []string{"foo", "bar"},
 		Limit: 50,
-		Page: 1,
+		Page:  1,
 	}
-	q, err := qstring.MarshalString(query)
+	q, _ := qstring.MarshalString(query)
 	fmt.Println(q)
 	// Output: names=foo&names=bar&limit=50&page=1
 }
 ```
 
 ### Marshal url.Values
+
 ```go
 package main
 
@@ -94,21 +102,21 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dyninc/qstring"
+	"github.com/moogar0880/qstring"
 )
 
 // Query is the http request query struct.
 type Query struct {
-	Names    []string
-	Limit     int
-	Page      int
+	Names   []string
+	Limit   int
+	Page    int
 }
 
 func main() {
 	query := &Query{
 		Names: []string{"foo", "bar"},
 		Limit: 50,
-		Page: 1,
+		Page:  1,
 	}
 	q, err := qstring.Marshal(query)
 	fmt.Println(q)
@@ -117,6 +125,7 @@ func main() {
 ```
 
 ### Nested
+
 In the same spirit as other Unmarshaling libraries, `qstring` allows you to
 Marshal/Unmarshal nested structs
 
@@ -126,12 +135,12 @@ package main
 import (
 	"net/http"
 
-	"github.com/dyninc/qstring"
+	"github.com/moogar0880/qstring"
 )
 
 // PagingParams represents common pagination information for query strings
 type PagingParams struct {
-	Page int
+	Page  int
 	Limit int
 }
 
@@ -143,6 +152,7 @@ type Query struct {
 ```
 
 ### Complex Structures
+
 Again, in the spirit of other Unmarshaling libraries, `qstring` allows for some
 more complex types, such as pointers and time.Time fields. A more complete
 example might look something like the following code snippet
@@ -156,8 +166,8 @@ import (
 
 // PagingParams represents common pagination information for query strings
 type PagingParams struct {
-	Page int	`qstring:"page"`
-	Limit int `qstring:"limit"`
+	Page  int   `qstring:"page"`
+	Limit int   `qstring:"limit"`
 }
 
 // Query is the http request query struct.
@@ -171,6 +181,7 @@ type Query struct {
 ```
 
 ## Additional Notes
+
 * All Timestamps are assumed to be in RFC3339 format
 * A struct field tag of `qstring` is supported and supports all of the features
 you've come to know and love from Go (un)marshalers.
@@ -179,6 +190,7 @@ you've come to know and love from Go (un)marshalers.
 	being marshaled has a zero value. `qstring:"name,omitempty"`
 
 ### Custom Fields
+
 In order to facilitate more complex queries `qstring` also provides some custom
 fields to save you a bit of headache with custom marshal/unmarshaling logic.
 Currently the following custom fields are provided:
@@ -188,8 +200,9 @@ logical operators (<, >, <=, >=) such as `?created<=2006-01-02T15:04:05Z`
 
 
 ## Benchmarks
+
 ```
-BenchmarkUnmarshall-4 	  500000	      2711 ns/op	     448 B/op	      23 allocs/op
+BenchmarkUnmarshal-4 	  500000	      2711 ns/op	     448 B/op	      23 allocs/op
 BenchmarkRawPLiteral-4	 1000000	      1675 ns/op	     448 B/op	      23 allocs/op
-ok  	github.com/dyninc/qstring	3.163s
+ok  	github.com/moogar0880/qstring	3.163s
 ```

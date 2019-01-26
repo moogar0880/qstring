@@ -1,6 +1,7 @@
 package qstring
 
 import (
+	"errors"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -8,10 +9,10 @@ import (
 	"time"
 )
 
-// Unmarshaller defines the interface for performing custom unmarshalling of
+// Unmarshaler defines the interface for performing custom unmarshalling of
 // query strings into struct values
-type Unmarshaller interface {
-	UnmarshalQuery(url.Values) error
+type Unmarshaler interface {
+	UnmarshalQuery([]string) error
 }
 
 // Unmarshal unmarshalls the provided url.Values (query string) into the
@@ -54,9 +55,11 @@ func (d *decoder) unmarshal(v interface{}) error {
 		return &InvalidUnmarshalError{reflect.TypeOf(v)}
 	}
 
-	switch val := v.(type) {
-	case Unmarshaller:
-		return val.UnmarshalQuery(d.data)
+	switch v.(type) {
+	case Unmarshaler:
+		// TODO: is this actually a special case?
+		// return actual.UnmarshalQuery(d.data)
+		return errors.New("unsupported type :(")
 	default:
 		return d.value(rv)
 	}
@@ -152,6 +155,8 @@ func (d *decoder) coerce(query string, target reflect.Kind, field reflect.Value)
 			if err == nil {
 				field.Set(reflect.ValueOf(t))
 			}
+		case Unmarshaler:
+			// TODO: this
 		default:
 			d.value(field)
 		}
