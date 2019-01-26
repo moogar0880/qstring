@@ -9,20 +9,20 @@ import (
 )
 
 // Marshaler defines the interface for performing custom marshaling of struct
-// values into query strings
+// values into query strings.
 type Marshaler interface {
 	MarshalQuery() (url.Values, error)
 }
 
-// Marshal marshals the provided struct into a url.Values collection
+// Marshal marshals the provided struct into a url.Values collection.
 func Marshal(v interface{}) (url.Values, error) {
 	var e encoder
 	e.init(v)
 	return e.marshal()
 }
 
-// Marshal marshals the provided struct into a raw query string and returns a
-// conditional error
+// MarshalString marshals the provided struct into a raw query string and
+// returns a conditional error.
 func MarshalString(v interface{}) (string, error) {
 	values, err := Marshal(v)
 	if err != nil {
