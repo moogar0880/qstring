@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dyninc/qstring"
+	"github.com/moogar0880/qstring"
 )
 
 func ExampleUnmarshal() {
@@ -63,20 +63,6 @@ func ExampleUnmarshal_complex() {
 	query := &Query{}
 	qValues, _ := url.ParseQuery("names=foo&names=bar&limit=50&page=1&ids=1&ids=2&created=2006-01-02T15:04:05Z")
 	err := qstring.Unmarshal(qValues, query)
-	if err != nil {
-		panic("Unable to Parse Query String")
-	}
-}
-
-func ExampleComparativeTime() {
-	type DateQuery struct {
-		Created  qstring.ComparativeTime
-		Modified qstring.ComparativeTime
-	}
-
-	var query DateQuery
-	qValues, _ := url.ParseQuery("created=>=2006-01-02T15:04:05Z&modified=<=2016-01-01T15:04Z")
-	err := qstring.Unmarshal(qValues, &query)
 	if err != nil {
 		panic("Unable to Parse Query String")
 	}
