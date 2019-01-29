@@ -202,7 +202,8 @@ logical operators (<, >, <=, >=) such as `?created<=2006-01-02T15:04:05Z`
 ## Benchmarks
 
 ```
-BenchmarkUnmarshal-4 	  500000	      2711 ns/op	     448 B/op	      23 allocs/op
-BenchmarkRawPLiteral-4	 1000000	      1675 ns/op	     448 B/op	      23 allocs/op
-ok  	github.com/moogar0880/qstring	3.163s
+BenchmarkUnmarshal-8     	  500000	      2140 ns/op	     448 B/op	      25 allocs/op
+BenchmarkRawPLiteral-8   	 2000000	       625 ns/op	     448 B/op	      25 allocs/op
+PASS
+ok  	github.com/moogar0880/qstring	2.992s
 ```
