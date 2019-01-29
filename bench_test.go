@@ -19,8 +19,9 @@ func BenchmarkUnmarshal(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
+
+	var data QueryStruct
 	for i := 0; i < b.N; i++ {
-		var data QueryStruct
 		if err := Unmarshal(query, &data); err != nil {
 			b.Fatal(err)
 		}
@@ -41,9 +42,10 @@ func BenchmarkRawPLiteral(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
+
 	b.RunParallel(func(pb *testing.PB) {
+		var data QueryStruct
 		for pb.Next() {
-			var data QueryStruct
 			if err := Unmarshal(query, &data); err != nil {
 				b.Fatal(err)
 			}

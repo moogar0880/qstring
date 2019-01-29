@@ -1,43 +1,24 @@
 package qstring
 
 import (
-	"errors"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 )
 
-// Unmarshaler defines the interface for performing custom unmarshalling of
+// Unmarshaler defines the interface for performing custom unmarshaling of
 // query strings into struct values
 type Unmarshaler interface {
 	UnmarshalQuery([]string) error
 }
 
-// Unmarshal unmarshalls the provided url.Values (query string) into the
+// Unmarshal unmarshals the provided url.Values (query string) into the
 // interface provided
 func Unmarshal(data url.Values, v interface{}) error {
 	var d decoder
 	d.init(data)
 	return d.unmarshal(v)
-}
-
-// An InvalidUnmarshalError describes an invalid argument passed to Unmarshal.
-// (The argument to Unmarshal must be a non-nil pointer.)
-type InvalidUnmarshalError struct {
-	Type reflect.Type
-}
-
-func (e InvalidUnmarshalError) Error() string {
-	if e.Type == nil {
-		return "qstring: Unmarshal(nil)"
-	}
-
-	if e.Type.Kind() != reflect.Ptr {
-		return "qstring: Unmarshal(non-pointer " + e.Type.String() + ")"
-	}
-	return "qstring: Unmarshal(nil " + e.Type.String() + ")"
 }
 
 type decoder struct {
@@ -52,35 +33,46 @@ func (d *decoder) init(data url.Values) *decoder {
 func (d *decoder) unmarshal(v interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &InvalidUnmarshalError{reflect.TypeOf(v)}
+		return NewInvalidUnmarshalError(reflect.TypeOf(v))
 	}
-
-	switch v.(type) {
-	case Unmarshaler:
-		// TODO: is this actually a special case?
-		// return actual.UnmarshalQuery(d.data)
-		return errors.New("unsupported type :(")
-	default:
-		return d.value(rv)
-	}
+	return d.value(rv)
 }
 
-func (d *decoder) value(val reflect.Value) error {
-	var err error
-	elem := val.Elem()
+func (d *decoder) elemIsUnmarshaler(val reflect.Value) (reflect.Value, bool) {
+	if _, ok := val.Interface().(Unmarshaler); ok {
+		return val, ok
+	}
+
+	if val.CanAddr() {
+		if _, ok := val.Addr().Interface().(Unmarshaler); ok {
+			return val.Addr(), ok
+		}
+	}
+	return val, false
+}
+
+func (d *decoder) value(val reflect.Value) (err error) {
+	var elem reflect.Value
+	if val.CanAddr() {
+		elem = val.Addr().Elem()
+	} else {
+		elem = val.Elem()
+	}
 	typ := elem.Type()
 
 	for i := 0; i < elem.NumField(); i++ {
-		// pull out the qstring struct tag
 		elemField := elem.Field(i)
 		typField := typ.Field(i)
-		qstring, _ := parseTag(typField.Tag.Get(Tag))
+
+		// pull out the qstring struct tag
+		qstring, _ := parseTag(typField.Tag.Get(tag))
 		if qstring == "" {
-			// resolvable fields must have at least the `flag` struct tag
+			// if this field doesn't have an explicit tag name, then base it
+			// off of the name of the field
 			qstring = strings.ToLower(typField.Name)
 		}
 
-		// determine if this is an unsettable field or was explicitly set to be
+		// determine if this is an un-settable field or was explicitly set to be
 		// ignored
 		if !elemField.CanSet() || qstring == "-" {
 			continue
@@ -88,11 +80,19 @@ func (d *decoder) value(val reflect.Value) error {
 
 		// only do work if the current fields query string parameter was provided
 		if query, ok := d.data[qstring]; ok {
+			// check up front to see if we can send off unmarshaling logic
+			var isUnmarshaler bool
+			elemField, isUnmarshaler = d.elemIsUnmarshaler(elemField)
+			if isUnmarshaler {
+				return elemField.Interface().(Unmarshaler).UnmarshalQuery(query)
+			}
+
+			// otherwise, process the field or slice normally
 			switch k := typField.Type.Kind(); k {
 			case reflect.Slice:
 				err = d.coerceSlice(query, k, elemField)
 			default:
-				err = d.coerce(query[0], k, elemField)
+				err = d.coerce(d.data.Get(qstring), k, elemField)
 			}
 		} else if typField.Type.Kind() == reflect.Struct {
 			if elemField.CanAddr() {
@@ -136,32 +136,8 @@ func (d *decoder) coerce(query string, target reflect.Kind, field reflect.Value)
 			field.SetFloat(c.(float64))
 		}
 	case reflect.Struct:
-		// unescape the query parameter before attempting to parse it
-		query, err = url.QueryUnescape(query)
-		if err != nil {
-			return err
-		}
-
-		switch field.Interface().(type) {
-		case time.Time:
-			var t time.Time
-			t, err = time.Parse(time.RFC3339, query)
-			if err == nil {
-				field.Set(reflect.ValueOf(t))
-			}
-		case ComparativeTime:
-			t := *NewComparativeTime()
-			err = t.Parse(query)
-			if err == nil {
-				field.Set(reflect.ValueOf(t))
-			}
-		case Unmarshaler:
-			// TODO: this
-		default:
-			d.value(field)
-		}
+		return d.value(field)
 	}
-
 	return err
 }
 
@@ -179,8 +155,7 @@ func (d *decoder) coerceSlice(query []string, target reflect.Kind, field reflect
 	slice.Elem().Set(sl)
 	for _, q := range query {
 		val := reflect.New(sliceType).Elem()
-		err = d.coerce(q, coerceKind, val)
-		if err != nil {
+		if err = d.coerce(q, coerceKind, val); err != nil {
 			return err
 		}
 		slice.Elem().Set(reflect.Append(slice.Elem(), val))

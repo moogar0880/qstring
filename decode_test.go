@@ -3,8 +3,8 @@ package qstring
 import (
 	"errors"
 	"net/url"
+	"strings"
 	"testing"
-	"time"
 )
 
 type TestStruct struct {
@@ -85,8 +85,7 @@ func TestUnmarshal(t *testing.T) {
 		"float64s": []string{"7000", "7001", "7002"},
 	}
 
-	err := Unmarshal(query, &ts)
-	if err != nil {
+	if err := Unmarshal(query, &ts); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -118,8 +117,7 @@ func TestUnmarshalNested(t *testing.T) {
 
 	params := &Params{}
 
-	err := Unmarshal(query, params)
-	if err != nil {
+	if err := Unmarshal(query, params); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -128,88 +126,84 @@ func TestUnmarshalNested(t *testing.T) {
 	}
 }
 
-func TestUnmarshalTime(t *testing.T) {
-	type Query struct {
-		Created     time.Time
-		LastUpdated time.Time
-	}
-
-	createdTS := "2006-01-02T15:04:05Z"
-	updatedTS := "2016-01-02T15:04:05-07:00"
-
-	query := url.Values{
-		"created":     []string{createdTS},
-		"lastupdated": []string{updatedTS},
-	}
-
-	params := &Query{}
-	err := Unmarshal(query, params)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	if params.Created.Format(time.RFC3339) != createdTS {
-		t.Errorf("Expected created ts of %s, got %s instead.", createdTS, params.Created.Format(time.RFC3339))
-	}
-
-	if params.LastUpdated.Format(time.RFC3339) != updatedTS {
-		t.Errorf("Expected update ts of %s, got %s instead.", updatedTS, params.LastUpdated.Format(time.RFC3339))
-	}
-}
-
 func TestUnmarshalInvalidTypes(t *testing.T) {
-	var err error
 	var ts *TestStruct
-	testio := []struct {
+	testIO := []struct {
+		name      string
 		inp       interface{}
 		errString string
 	}{
-		{inp: nil, errString: "qstring: Unmarshal(nil)"},
-		{inp: TestStruct{}, errString: "qstring: Unmarshal(non-pointer qstring.TestStruct)"},
-		{inp: ts, errString: "qstring: Unmarshal(nil *qstring.TestStruct)"},
+		{
+			name:      "should fail to unmarshal nil value",
+			inp:       nil,
+			errString: "qstring: Unmarshal(nil)",
+		},
+		{
+			name:      "should fail to unmarshal non-pointer value",
+			inp:       TestStruct{},
+			errString: "qstring: Unmarshal(non-pointer qstring.TestStruct)",
+		},
+		{
+			name:      "should fail to unmarshal uninitialized pointer value",
+			inp:       ts,
+			errString: "qstring: Unmarshal(nil *qstring.TestStruct)",
+		},
 	}
 
-	for _, test := range testio {
-		err = Unmarshal(url.Values{}, test.inp)
-		if err == nil {
-			t.Errorf("Expected invalid type error, got success instead")
-		}
+	for _, test := range testIO {
+		t.Run(test.name, func(t *testing.T) {
+			err := Unmarshal(url.Values{}, test.inp)
+			if err == nil {
+				t.Errorf("Expected invalid type error, got success instead")
+			}
 
-		if err.Error() != test.errString {
-			t.Errorf("Got %q error, expected %q", err.Error(), test.errString)
-		}
+			if err.Error() != test.errString {
+				t.Errorf("Got %q error, expected %q", err.Error(), test.errString)
+			}
+		})
 	}
 }
 
 var errNoNames = errors.New("no names provided")
 
-type MarshalInterfaceTest struct {
-	Names []string
-}
+type String string
 
-func (u *MarshalInterfaceTest) UnmarshalQuery(v url.Values) error {
-	var ok bool
-	if u.Names, ok = v["names"]; ok {
-		return nil
+func (f *String) UnmarshalQuery(v []string) error {
+	if len(v) == 0 {
+		return errNoNames
 	}
-	return errNoNames
+	*f = String(strings.ToLower(v[0]))
+	return nil
 }
 
-//
-// func TestUnmarshaler(t *testing.T) {
-// 	testIO := []struct {
-// 		inp      url.Values
-// 		expected interface{}
-// 	}{
-// 		{url.Values{"names": []string{"foo", "bar"}}, nil},
-// 		{make(url.Values), errNoNames},
-// 	}
-//
-// 	s := &MarshalInterfaceTest{Names: []string{}}
-// 	for _, test := range testIO {
-// 		err := Unmarshal(test.inp, s)
-// 		if err != test.expected {
-// 			t.Errorf("Expected Unmarshaler to return %s, but got %s instead", test.expected, err)
-// 		}
-// 	}
-// }
+type UnmarshalInterfaceTest struct {
+	Name String `qstring:"names"`
+}
+
+func TestUnmarshaler(t *testing.T) {
+	testIO := []struct {
+		name     string
+		inp      url.Values
+		expected interface{}
+	}{
+		{
+			name:     "should unmarshal matching query string",
+			inp:      url.Values{"names": []string{"foo", "bar"}},
+			expected: nil,
+		},
+		{
+			name:     "should return error on empty query param",
+			inp:      url.Values{"names": []string{}},
+			expected: errNoNames,
+		},
+	}
+
+	var s UnmarshalInterfaceTest
+	for _, test := range testIO {
+		t.Run(test.name, func(t *testing.T) {
+			if err := Unmarshal(test.inp, &s); err != test.expected {
+				t.Errorf("Expected Unmarshaler to return %s, but got %s instead", test.expected, err)
+			}
+		})
+	}
+}

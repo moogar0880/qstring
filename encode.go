@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Marshaler defines the interface for performing custom marshaling of struct
@@ -31,23 +30,6 @@ func MarshalString(v interface{}) (string, error) {
 	return values.Encode(), nil
 }
 
-// An InvalidMarshalError describes an invalid argument passed to Marshal or
-// MarshalValue. (The argument to Marshal must be a non-nil pointer.)
-type InvalidMarshalError struct {
-	Type reflect.Type
-}
-
-func (e InvalidMarshalError) Error() string {
-	if e.Type == nil {
-		return "qstring: MarshalString(nil)"
-	}
-
-	if e.Type.Kind() != reflect.Ptr {
-		return "qstring: MarshalString(non-pointer " + e.Type.String() + ")"
-	}
-	return "qstring: MarshalString(nil " + e.Type.String() + ")"
-}
-
 type encoder struct {
 	data interface{}
 }
@@ -60,7 +42,7 @@ func (e *encoder) init(v interface{}) *encoder {
 func (e *encoder) marshal() (url.Values, error) {
 	rv := reflect.ValueOf(e.data)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return nil, &InvalidMarshalError{reflect.TypeOf(e.data)}
+		return nil, NewInvalidMarshalError(reflect.TypeOf(e.data))
 	}
 
 	switch val := e.data.(type) {
@@ -81,9 +63,8 @@ func (e *encoder) value(val reflect.Value) (url.Values, error) {
 		// pull out the qstring struct tag
 		elemField := elem.Field(i)
 		typField := typ.Field(i)
-		qstring, omit := parseTag(typField.Tag.Get(Tag))
+		qstring, omit := parseTag(typField.Tag.Get(tag))
 		if qstring == "" {
-			// resolvable fields must have at least the `flag` struct tag
 			qstring = strings.ToLower(typField.Name)
 		}
 
@@ -133,12 +114,12 @@ func marshalValue(field reflect.Value, source reflect.Kind) string {
 	case reflect.Float32, reflect.Float64:
 		return strconv.FormatFloat(field.Float(), 'G', -1, 64)
 	case reflect.Struct:
-		switch field.Interface().(type) {
-		case time.Time:
-			return field.Interface().(time.Time).Format(time.RFC3339)
-		case ComparativeTime:
-			return field.Interface().(ComparativeTime).String()
-		}
+		// switch field.Interface().(type) {
+		// case time.Time:
+		// 	return field.Interface().(time.Time).Format(time.RFC3339)
+		// case ComparativeTime:
+		// 	return field.Interface().(ComparativeTime).String()
+		// }
 	}
 	return ""
 }
@@ -146,8 +127,8 @@ func marshalValue(field reflect.Value, source reflect.Kind) string {
 func marshalStruct(output url.Values, qstring string, field reflect.Value, source reflect.Kind) error {
 	var err error
 	switch field.Interface().(type) {
-	case time.Time, ComparativeTime:
-		output.Set(qstring, marshalValue(field, source))
+	// case time.Time, ComparativeTime:
+	// 	output.Set(qstring, marshalValue(field, source))
 	default:
 		var values url.Values
 		if field.CanAddr() {
@@ -162,4 +143,30 @@ func marshalStruct(output url.Values, qstring string, field reflect.Value, sourc
 		}
 	}
 	return nil
+}
+
+// isEmptyValue returns true if the provided reflect.Value
+func isEmptyValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
+		return v.Len() == 0
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Interface, reflect.Ptr:
+		return v.IsNil()
+	case reflect.Struct:
+		// switch t := v.Interface().(type) {
+		// case time.Time:
+		// 	return t.IsZero()
+		// case ComparativeTime:
+		// 	return t.Time.IsZero()
+		// }
+	}
+	return false
 }

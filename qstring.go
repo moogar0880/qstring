@@ -1,7 +1,22 @@
 package qstring
 
+import "strings"
+
 const (
-	// Tag indicates the name of the struct tag to extract from provided structs
+	// tag indicates the name of the struct tag to extract from provided structs
 	// when marshaling or unmarshaling
-	Tag = "qstring"
+	tag = "qstring"
 )
+
+// parseTag splits a struct field's qstring tag into its name and, if an
+// optional omitempty option was provided, a boolean indicating this is
+// returned
+func parseTag(tag string) (string, bool) {
+	if idx := strings.Index(tag, ","); idx != -1 {
+		if tag[idx+1:] == "omitempty" {
+			return tag[:idx], true
+		}
+		return tag[:idx], false
+	}
+	return tag, false
+}

@@ -25,3 +25,6 @@ _testmain.go
 
 # Coverage reports
 coverage.*
+
+# editor configs
+.idea/

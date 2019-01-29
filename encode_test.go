@@ -2,10 +2,48 @@ package qstring
 
 import (
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestIsEmptyValue(t *testing.T) {
+	var ts *TestStruct
+	ts = nil
+	testIO := []struct {
+		name     string
+		inp      reflect.Value
+		expected bool
+	}{
+		{name: "should return false for populated slice", inp: reflect.ValueOf([]int{0}), expected: false},
+		{name: "should return true for empty slice", inp: reflect.ValueOf([]int{}), expected: true},
+		{name: "should return false for populated map", inp: reflect.ValueOf(map[string]int{"a": 0}), expected: false},
+		{name: "should return true for empty map", inp: reflect.ValueOf(map[string]int{}), expected: true},
+		{name: "should return true for boolean false", inp: reflect.ValueOf(false), expected: true},
+		{name: "should return false for boolean true", inp: reflect.ValueOf(true), expected: false},
+		{name: "should return false for int five", inp: reflect.ValueOf(5), expected: false},
+		{name: "should return true for int zero", inp: reflect.ValueOf(0), expected: true},
+		{name: "should return false for uint five", inp: reflect.ValueOf(uint(5)), expected: false},
+		{name: "should return true for uint zero", inp: reflect.ValueOf(uint(0)), expected: true},
+		{name: "should return false for float five", inp: reflect.ValueOf(float32(5)), expected: false},
+		{name: "should return true for float zero", inp: reflect.ValueOf(float32(0)), expected: true},
+		{name: "should return true for uninitialized struct pointer", inp: reflect.ValueOf(&TestStruct{}), expected: false},
+		{name: "should return true for nil struct pointer", inp: reflect.ValueOf(ts), expected: true},
+		{name: "should return false for nil", inp: reflect.ValueOf(nil), expected: false},
+		{name: "should return false for zero value time.Time", inp: reflect.ValueOf(time.Time{}), expected: false},
+		{name: "should return false for populated time.Time", inp: reflect.ValueOf(time.Now()), expected: false},
+	}
+
+	for _, test := range testIO {
+		t.Run(test.name, func(t *testing.T) {
+			result := isEmptyValue(test.inp)
+			if result != test.expected {
+				t.Errorf("Expected %t for input %s, got %t", test.expected, test.inp, result)
+			}
+		})
+	}
+}
 
 func TestMarshalString(t *testing.T) {
 	ts := TestStruct{
@@ -156,38 +194,6 @@ func TestInvalidMarshalString(t *testing.T) {
 	}
 }
 
-func TestMarshalTime(t *testing.T) {
-	type Query struct {
-		Created     time.Time
-		LastUpdated time.Time
-	}
-
-	createdTS := "2006-01-02T15:04:05Z"
-	createdTime, _ := time.Parse(time.RFC3339, createdTS)
-	updatedTS := "2016-01-02T15:04:05-07:00"
-	updatedTime, _ := time.Parse(time.RFC3339, updatedTS)
-
-	q := &Query{Created: createdTime, LastUpdated: updatedTime}
-	result, err := MarshalString(q)
-	if err != nil {
-		t.Fatalf("Unable to marshal timestamp: %s", err.Error())
-	}
-
-	var unescaped string
-	unescaped, err = url.QueryUnescape(result)
-	if err != nil {
-		t.Fatalf("Unable to unescape query string %q: %q", result, err.Error())
-	}
-
-	expected := []string{"created=2006-01-02T15:04:05Z",
-		"lastupdated=2016-01-02T15:04:05-07:00"}
-	for _, ts := range expected {
-		if !strings.Contains(unescaped, ts) {
-			t.Errorf("Expected query string %s to contain %s", unescaped, ts)
-		}
-	}
-}
-
 func TestMarshalNested(t *testing.T) {
 	type Paging struct {
 		Page  int
@@ -228,7 +234,7 @@ func TestMarshalNested(t *testing.T) {
 	}
 }
 
-func TestMarshalNestedPtrs(t *testing.T) {
+func TestMarshalNestedPointers(t *testing.T) {
 	type Paging struct {
 		Page  int
 		Limit int
@@ -239,8 +245,12 @@ func TestMarshalNestedPtrs(t *testing.T) {
 		Name   string
 	}
 
-	params := &Params{Name: "SomeName",
-		Paging: &Paging{Page: 1, Limit: 50},
+	params := &Params{
+		Name: "SomeName",
+		Paging: &Paging{
+			Page:  1,
+			Limit: 50,
+		},
 	}
 
 	result, err := MarshalString(params)
@@ -266,6 +276,10 @@ func TestMarshalNestedPtrs(t *testing.T) {
 			t.Errorf("Expected query string %s to contain %s", unescaped, q)
 		}
 	}
+}
+
+type MarshalInterfaceTest struct {
+	Names []string `json:"names"`
 }
 
 func (u *MarshalInterfaceTest) MarshalQuery() (url.Values, error) {
